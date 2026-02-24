@@ -2,223 +2,122 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Centro Global de Monitoreo Sísmico</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
+<title>🌎 Sismo Monitoreo TV</title>
 <style>
 body {
-  margin: 0;
-  background: #000;
-  color: #00ffe1;
-  font-family: Arial, sans-serif;
+    margin:0;
+    padding:0;
+    background:black;
+    color:#00ffcc;
+    font-family: Arial, sans-serif;
+    text-align:center;
 }
 
-header {
-  background: #050505;
-  padding: 10px;
-  text-align: center;
-  font-size: 22px;
-  font-weight: bold;
-  border-bottom: 2px solid red;
+h1 {
+    padding: 20px 0;
+    font-size: 2em;
 }
 
-#grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  height: 92vh;
+#alerta {
+    font-size: 2em;
+    color:red;
+    font-weight:bold;
+    animation: blink 1s infinite;
 }
 
-#map { height: 100%; }
-
-#panel {
-  background: #050505;
-  border-left: 2px solid red;
-  padding: 10px;
-  overflow-y: auto;
-}
+@keyframes blink { 50% { opacity: 0; } }
 
 .card {
-  background: #111;
-  border: 1px solid #00ffe1;
-  padding: 10px;
-  margin-bottom: 10px;
-  border-radius: 6px;
+    background:#0a0a0a;
+    border:2px solid #00ffe1;
+    padding:12px;
+    margin:10px auto;
+    border-radius:10px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow:0 0 10px #00ffe155;
+    text-align:left;
 }
 
-h3 { margin: 0 0 5px; color: white; }
-
-.alerta {
-  color: red;
-  font-size: 20px;
-  font-weight: bold;
+.big-mag {
+    font-size:32px;
+    font-weight:bold;
+    color: yellow;
 }
 
 button {
-  width: 100%;
-  padding: 12px;
-  background: red;
-  border: none;
-  color: white;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
+    padding:10px 20px;
+    font-size:18px;
+    border:none;
+    border-radius:5px;
+    background:red;
+    color:white;
+    margin:20px;
+    cursor:pointer;
 }
 
-button:hover { background: #ff3333; }
-
-#ticker {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  background: red;
-  color: white;
-  font-size: 20px;
-  padding: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-#ticker span {
-  display: inline-block;
-  padding-left: 100%;
-  animation: scroll 15s linear infinite;
-}
-
-@keyframes scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-100%); }
+button:hover {
+    background:#ff5555;
 }
 </style>
 </head>
-
 <body>
 
-<header>🌎 CENTRO GLOBAL DE MONITOREO SÍSMICO — IRIS / JMA / USGS / SSN</header>
+<h1>🌐 MONITOREO SÍSMICO GLOBAL</h1>
+<div id="alerta"></div>
+<div id="sismos"></div>
 
-<div id="grid">
-  <div id="map"></div>
-
-  <div id="panel">
-    <div class="card">
-      <h3>📡 IRIS</h3>
-      <div id="iris"></div>
-    </div>
-
-    <div class="card">
-      <h3>🇯🇵 JMA Japón</h3>
-      <div id="jma"></div>
-    </div>
-
-    <div class="card">
-      <h3>🌐 USGS</h3>
-      <div id="usgs"></div>
-    </div>
-
-    <div class="card">
-      <h3>🇲🇽 SSN México</h3>
-      <div id="ssn"></div>
-    </div>
-
-    <div class="card">
-      <h3>⚠️ Estado</h3>
-      <div id="estado">Sistema activo</div>
-    </div>
-
-    <div class="card">
-      <button onclick="simulacro()">🚨 SIMULAR SISMO FUERTE</button>
-    </div>
-  </div>
-</div>
-
-<div id="ticker"><span id="tickerText">Cargando ticker...</span></div>
+<button onclick="simulacro()">🚨 SIMULACRO SISMO FUERTE</button>
 
 <script>
-const API = "https://monitoreo-api-6evu.onrender.com/api/sismo";
-const SIM = "https://monitoreo-api-6evu.onrender.com/api/simulacro";
-const TICKER = "https://monitoreo-api-6evu.onrender.com/api/ticker";
+const API_URL = "https://web-production-bd57f.up.railway.app";
 
-// MAPA GLOBAL
-let map = L.map('map').setView([20, 0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-let markers = [];
+// Función para cargar sismos desde la API
+async function cargarSismos() {
+    try {
+        const res = await fetch(`${API_URL}/api/sismos`);
+        const data = await res.json();
 
-// COLORES POR FUENTE
-const colores = {
-  "IRIS": "cyan",
-  "JMA Japón": "yellow",
-  "USGS": "green",
-  "SSN México": "orange",
-  "SIMULACRO": "red"
-};
+        let html = "";
+        let alerta = "";
 
-// ================= CARGAR SISMOS =================
-async function cargar() {
-  let r = await fetch(API);
-  let data = await r.json();
+        data.forEach(s => {
+            html += `<div class="card">
+                <div class="big-mag">M ${s.magnitud}</div>
+                <b>${s.fuente}</b><br>
+                Lugar: ${s.lugar}<br>
+                Tiempo: ${new Date(s.tiempo).toLocaleString('es-MX')}
+            </div>`;
 
-  // limpiar
-  markers.forEach(m => map.removeLayer(m));
-  markers = [];
+            if (s.magnitud >= 6) {
+                alerta = "⚠ SISMO FUERTE DETECTADO";
+            }
+        });
 
-  document.getElementById("iris").innerHTML = "";
-  document.getElementById("jma").innerHTML = "";
-  document.getElementById("usgs").innerHTML = "";
-  document.getElementById("ssn").innerHTML = "";
-
-  data.forEach(d => {
-    let box = d.fuente.includes("IRIS") ? "iris" :
-              d.fuente.includes("JMA") ? "jma" :
-              d.fuente.includes("USGS") ? "usgs" : "ssn";
-
-    document.getElementById(box).innerHTML = `
-      Magnitud: <b>${d.magnitud}</b><br>
-      Lugar: ${d.lugar}<br>
-      Hora: ${d.hora}<br>
-      Profundidad: ${d.profundidad || "N/A"} km
-    `;
-
-    // MAPA
-    if(d.lat && d.lon){
-      let color = colores[d.fuente] || "white";
-      let m = L.circleMarker([d.lat, d.lon], {
-        radius: 10,
-        color: color,
-        fillOpacity: 0.9
-      }).addTo(map).bindPopup(`${d.fuente}<br>M${d.magnitud}<br>${d.lugar}`);
-      markers.push(m);
+        document.getElementById("sismos").innerHTML = html;
+        document.getElementById("alerta").innerText = alerta;
+    } catch (err) {
+        console.error(err);
+        document.getElementById("sismos").innerHTML = "<p>Error cargando datos.</p>";
     }
-
-    // ALERTA FUERTE
-    if(d.magnitud >= 6){
-      document.getElementById("estado").innerHTML =
-        "<div class='alerta'>🚨 SISMO FUERTE DETECTADO</div>";
-      new Audio("https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3").play();
-    }
-  });
 }
 
-// ================= SIMULACRO =================
+// Función simulacro
 async function simulacro() {
-  await fetch(SIM);
-  alert("SIMULACRO ACTIVADO");
-  cargar();
+    try {
+        const res = await fetch(`${API_URL}/api/simulacro`);
+        const s = await res.json();
+        alert(`SIMULACRO MAG ${s.magnitud} en ${s.lugar}`);
+    } catch (err) {
+        console.error(err);
+        alert("Error al ejecutar simulacro");
+    }
 }
 
-// ================= TICKER =================
-async function cargarTicker() {
-  let r = await fetch(TICKER);
-  let d = await r.json();
-  document.getElementById("tickerText").innerText = "🔴 " + d.mensaje;
-}
-
-// AUTO REFRESH
-cargar();
-cargarTicker();
-setInterval(cargar, 5000);
-setInterval(cargarTicker, 8000);
+// Refresh automático cada 10 segundos
+cargarSismos();
+setInterval(cargarSismos, 10000);
 </script>
 
 </body>

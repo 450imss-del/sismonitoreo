@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Panel Sísmico Global TV</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+body {
+  margin: 0;
+  background: #000;
+  color: #00ff9c;
+  font-family: Arial, sans-serif;
+}
+
+header {
+  background: #050505;
+  padding: 10px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  border-bottom: 2px solid red;
+}
+
+#grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  height: 92vh;
+}
+
+#map {
+  height: 100%;
+}
+
+#panel {
+  background: #050505;
+  border-left: 2px solid red;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.card {
+  background: #111;
+  border: 1px solid #00ff9c;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+}
+
+h3 {
+  margin: 0 0 5px;
+  color: #fff;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: red;
+  border: none;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #ff3333;
+}
+
+.alerta {
+  color: red;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+#ticker {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: red;
+  color: white;
+  font-size: 20px;
+  padding: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#ticker span {
+  display: inline-block;
+  padding-left: 100%;
+  animation: scroll 15s linear infinite;
+}
+
+@keyframes scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+</style>
+</head>
+
+<body>
+
+<header>🌍 PANEL GLOBAL DE MONITOREO SÍSMICO — MODO TV NOTICIAS</header>
+
+<div id="grid">
+  <div id="map"></div>
+
+  <div id="panel">
+    <div class="card">
+      <h3>📡 Eventos Sísmicos</h3>
+      <div id="lista"></div>
+    </div>
+
+    <div class="card">
+      <h3>⚠️ Estado</h3>
+      <div id="estado">Sistema activo en tiempo real</div>
+    </div>
+
+    <div class="card">
+      <button onclick="simulacro()">🚨 SIMULAR SISMO FUERTE</button>
+    </div>
+  </div>
+</div>
+
+<div id="ticker"><span id="tickerText">Cargando ticker sísmico...</span></div>
+
+<script>
+const API = "https://monitoreo-api-6evu.onrender.com/api/sismo";
+const SIM = "https://monitoreo-api-6evu.onrender.com/api/simulacro";
+const TICKER = "https://monitoreo-api-6evu.onrender.com/api/ticker";
+
+// MAPA
+let map = L.map('map').setView([20, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+let markers = [];
+
+// ================== CARGAR SISMOS ==================
+async function cargar() {
+  let r = await fetch(API);
+  let data = await r.json();
+  let html = "";
+
+  // limpiar markers
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  data.forEach(d => {
+    html += `
+      <div>
+      🌐 <b>${d.fuente}</b><br>
+      Magnitud: ${d.magnitud}<br>
+      Lugar: ${d.lugar}<br>
+      Hora: ${d.hora}<br><hr>
+      </div>
+    `;
+
+    if(d.lat && d.lon){
+      let color = d.magnitud >= 6 ? "red" : "green";
+      let m = L.circleMarker([d.lat, d.lon], {
+        radius: 8,
+        color: color,
+        fillOpacity: 0.8
+      }).addTo(map)
+      .bindPopup(`${d.fuente}<br>M${d.magnitud}<br>${d.lugar}`);
+      markers.push(m);
+    }
+
+    // ALERTA
+    if(d.magnitud >= 6){
+      document.getElementById("estado").innerHTML = "<div class='alerta'>🚨 SISMO FUERTE DETECTADO</div>";
+      new Audio("https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3").play();
+    }
+  });
+
+  document.getElementById("lista").innerHTML = html;
+}
+
+// ================== SIMULACRO ==================
+async function simulacro() {
+  let r = await fetch(SIM);
+  let d = await r.json();
+  alert("SIMULACRO ACTIVADO");
+  cargar();
+}
+
+// ================== TICKER ==================
+async function cargarTicker() {
+  let r = await fetch(TICKER);
+  let d = await r.json();
+  document.getElementById("tickerText").innerText = "🔴 " + d.mensaje;
+}
+
+// ================== AUTO REFRESH ==================
+cargar();
+cargarTicker();
+setInterval(cargar, 5000);
+setInterval(cargarTicker, 8000);
+</script>
+
+</body>
+</html>
